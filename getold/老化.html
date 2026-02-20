@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>身心老化指數評估</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hidden-screen { display: none !important; }
+        
+        /* 自訂按鈕選中與未選中的過渡效果 */
+        .option-btn { transition: all 0.2s ease; }
+        .option-btn.selected {
+            background-color: #f97316; /* orange-500 */
+            color: white;
+            box-shadow: 0 0 15px rgba(249, 115, 22, 0.5);
+            border-color: #fb923c; /* orange-400 */
+        }
+        .option-btn.unselected {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0; /* slate-200 */
+        }
+        .option-btn.unselected:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 font-sans selection:bg-orange-500/50 flex flex-col items-center justify-center p-4">
+    
+    <!-- 3D 夕陽背景 -->
+    <div class="fixed inset-0 z-[-1] bg-gradient-to-b from-[#1a0b2e] via-[#4a154b] to-[#c73e1d]">
+        <div id="three-container" class="absolute inset-0"></div>
+        <div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"></div>
+    </div>
+
+    <!-- 隱藏的音軌 -->
+    <audio id="bg-music" src="audio/getold.mp3" loop></audio>
+
+    <!-- 音樂控制按鈕群組 -->
+    <div class="fixed top-6 right-6 z-50 flex gap-3">
+        <button id="btn-stop-music" class="p-3 bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/20 rounded-full transition-all text-white/80 hover:text-red-400 shadow-lg flex items-center justify-center" title="停止音樂">
+            <i class="fa-solid fa-stop text-lg"></i>
+        </button>
+        <button id="btn-toggle-music" class="p-3 bg-black/40 hover:bg-black/60 backdrop-blur-md border border-white/20 rounded-full transition-all text-white/80 hover:text-white shadow-lg flex items-center justify-center w-[46px]" title="播放音樂">
+            <i id="icon-music" class="fa-solid fa-volume-xmark text-lg"></i>
+        </button>
+    </div>
+
+    <!-- ==================== 開始畫面 ==================== -->
+    <div id="screen-start" class="max-w-xl w-full bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-2xl shadow-2xl text-center transform transition-all hover:scale-[1.02]">
+        <h1 class="text-4xl md:text-5xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-orange-300 to-yellow-500 drop-shadow-sm">
+            身心老化指數評估
+        </h1>
+        <p class="text-lg text-slate-300 mb-8 leading-relaxed">
+            這不是測驗你的真實年齡，而是測量你的「心靈年紀」。<br/>
+            透過 20 題心理層面與 20 題精神層面的深度剖析，<br/>
+            看看在這個夕陽無限好的時光裡，你的身心狀態落在哪個座標。
+        </p>
+
+        <!-- 姓名輸入框 -->
+        <div class="mb-8 max-w-xs mx-auto">
+            <input
+                id="input-username"
+                type="text"
+                placeholder="請先輸入您的姓名或暱稱"
+                class="w-full px-4 py-3 bg-black/40 border border-white/30 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all text-center text-lg shadow-inner"
+            />
+        </div>
+
+        <button id="btn-start-quiz" disabled class="group relative inline-flex items-center justify-center px-8 py-4 font-bold text-white bg-gradient-to-r from-orange-500 to-red-600 rounded-full overflow-hidden shadow-lg transition-transform opacity-50 cursor-not-allowed">
+            <span class="absolute inset-0 w-full h-full -mt-1 rounded-lg opacity-30 bg-gradient-to-b from-transparent via-transparent to-black"></span>
+            <span class="relative flex items-center gap-2 text-lg">
+                開始深度評估 <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform ml-1"></i>
+            </span>
+        </button>
+    </div>
+
+    <!-- ==================== 測驗畫面 ==================== -->
+    <div id="screen-quiz" class="hidden-screen max-w-2xl w-full bg-white/10 backdrop-blur-xl border border-white/20 p-6 md:p-10 rounded-2xl shadow-2xl flex flex-col">
+        <!-- 進度條與狀態指示 -->
+        <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-2">
+                <i id="quiz-category-icon" class="fa-solid fa-brain text-pink-400 text-xl"></i>
+                <span id="quiz-category-text" class="font-semibold text-lg tracking-wide text-slate-200">
+                    心理層面評估
+                </span>
+            </div>
+            <span id="quiz-progress-text" class="text-sm font-medium bg-white/20 px-3 py-1 rounded-full">
+                1 / 40
+            </span>
+        </div>
+
+        <div class="w-full bg-black/30 rounded-full h-2.5 mb-8 overflow-hidden">
+            <div id="quiz-progress-bar" class="h-2.5 rounded-full transition-all duration-500 ease-out bg-pink-500" style="width: 2.5%"></div>
+        </div>
+
+        <!-- 題目區 -->
+        <div class="min-h-[120px] flex items-center justify-center mb-8">
+            <h2 id="quiz-question-text" class="text-2xl md:text-3xl font-bold text-center leading-snug drop-shadow-md">
+                題目載入中...
+            </h2>
+        </div>
+
+        <!-- 選項按鈕 -->
+        <div id="quiz-options-container" class="flex flex-col gap-3 mt-auto">
+            <!-- JavaScript 動態生成選項 -->
+        </div>
+
+        <!-- 導航按鈕 -->
+        <div class="flex justify-between mt-8 pt-6 border-t border-white/10">
+            <button id="btn-prev-q" disabled class="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-white/30 cursor-not-allowed">
+                <i class="fa-solid fa-arrow-left"></i> 上一題
+            </button>
+            <span class="text-slate-400 text-sm flex items-center">
+                請誠實作答
+            </span>
+        </div>
+    </div>
+
+    <!-- ==================== 結果畫面 ==================== -->
+    <div id="screen-result" class="hidden-screen max-w-4xl w-full bg-white/10 backdrop-blur-xl border border-white/20 p-6 md:p-10 rounded-2xl shadow-2xl flex flex-col items-center animate-fade-in">
+        <h2 id="result-user-name" class="text-3xl md:text-4xl font-extrabold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-orange-500 text-center">
+            評估結果出爐
+        </h2>
+        <p class="text-slate-300 mb-8 text-center">綜合評估您的心理與精神狀態</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mb-8">
+            <!-- 左側：數據與解說 -->
+            <div class="flex flex-col justify-center space-y-6">
+                <div class="bg-black/40 p-6 rounded-2xl border border-white/10">
+                    <h3 class="text-slate-400 text-sm uppercase tracking-wider mb-1">量化老化指數</h3>
+                    <div class="text-5xl font-black text-white flex items-baseline gap-2">
+                        <span id="result-total-index">0</span> <span class="text-xl text-slate-400 font-medium">/ 100</span>
+                    </div>
+                    <div class="mt-4 flex gap-4 text-sm">
+                        <div class="flex flex-col">
+                            <span class="text-pink-400 font-bold">心理老化: <span id="result-psy-percent">0</span>%</span>
+                            <span class="text-slate-400 text-xs">橫軸指標</span>
+                        </div>
+                        <div class="flex flex-col border-l border-white/20 pl-4">
+                            <span class="text-yellow-400 font-bold">精神老化: <span id="result-men-percent">0</span>%</span>
+                            <span class="text-slate-400 text-xs">縱軸指標</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-br from-white/10 to-transparent p-6 rounded-2xl border border-white/10">
+                    <div class="flex items-center gap-2 mb-3">
+                        <i class="fa-solid fa-circle-check text-green-400 text-2xl"></i>
+                        <h3 id="result-title" class="text-xl font-bold text-white">標題</h3>
+                    </div>
+                    <p id="result-desc" class="text-slate-200 leading-relaxed">
+                        說明文字
+                    </p>
+                </div>
+            </div>
+
+            <!-- 右側：2D 座標圖 -->
+            <div class="flex flex-col items-center justify-center bg-black/30 p-6 rounded-2xl border border-white/10 relative">
+                <p class="text-sm font-bold text-yellow-400 mb-2">精神老化 (疲憊/冷漠) ▲</p>
+                <div class="relative w-64 h-64 md:w-72 md:h-72 border-b-2 border-l-2 border-slate-400 bg-white/5 shadow-inner">
+                    <!-- 格線與標示 -->
+                    <div class="absolute inset-0 grid grid-cols-2 grid-rows-2 opacity-20 pointer-events-none">
+                        <div class="border-r border-b border-white border-dashed"></div>
+                        <div class="border-b border-white border-dashed"></div>
+                        <div class="border-r border-white border-dashed"></div>
+                        <div></div>
+                    </div>
+                    
+                    <!-- 四個象限標籤 -->
+                    <span class="absolute top-2 left-2 text-[10px] text-slate-400 opacity-60">過勞狀態</span>
+                    <span class="absolute top-2 right-2 text-[10px] text-slate-400 opacity-60">徹底初老</span>
+                    <span class="absolute bottom-2 left-2 text-[10px] text-slate-400 opacity-60">青春無敵</span>
+                    <span class="absolute bottom-2 right-2 text-[10px] text-slate-400 opacity-60">老成活力</span>
+
+                    <!-- 標記點 -->
+                    <div 
+                        id="result-dot"
+                        class="absolute w-6 h-6 bg-gradient-to-tr from-orange-400 to-red-500 rounded-full shadow-[0_0_15px_rgba(249,115,22,0.8)] border-2 border-white transform -translate-x-1/2 translate-y-1/2 transition-all duration-1000 ease-out z-10"
+                        style="left: 0%; bottom: 0%;"
+                    >
+                        <div class="absolute -inset-2 bg-orange-500/30 rounded-full animate-ping"></div>
+                    </div>
+                </div>
+                <p class="text-sm font-bold text-pink-400 mt-4">心理老化 (固執/懷舊) ▶</p>
+            </div>
+        </div>
+
+        <button id="btn-restart" class="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/30 rounded-full transition-colors text-white font-medium">
+            <i class="fa-solid fa-rotate-right"></i> 重新測驗
+        </button>
+    </div>
+
+    <!-- ==================== 程式邏輯 ==================== -->
+    <script>
+        // --- 問卷題目資料 ---
+        const questions = [
+            // 心理層面 (0-19)
+            { text: "覺得以前的音樂或電影比現在的好看/好聽太多了。", category: "心理" },
+            { text: "越來越不喜歡改變現狀，覺得維持原樣最舒服。", category: "心理" },
+            { text: "遇到新的科技產品或軟體，第一反應是排斥而不是好奇。", category: "心理" },
+            { text: "和朋友聊天時，話題越來越常圍繞在「當年我們...」。", category: "心理" },
+            { text: "對於年輕人的流行用語或網路迷因感到不解，甚至反感。", category: "心理" },
+            { text: "購物時，實用性與耐用度絕對大於外觀設計或品牌流行。", category: "心理" },
+            { text: "覺得去認識新朋友、建立新關係是一件極度耗費心力的事情。", category: "心理" },
+            { text: "假日的最高理想境界，就是待在家裡什麼都不做。", category: "心理" },
+            { text: "社群媒體的首頁，越來越多養生、健康或投資理財的資訊。", category: "心理" },
+            { text: "越來越難被電影、小說或生活中的小事情感動。", category: "心理" },
+            { text: "認為生活就是柴米油鹽，不再抱有太多浪漫的幻想。", category: "心理" },
+            { text: "看到年輕人犯錯，會有一股強烈的衝動想要「說教」或給建議。", category: "心理" },
+            { text: "在工作與生活中，認為「安穩」比「挑戰」重要非常多。", category: "心理" },
+            { text: "買衣服或鞋子時，「穿起來舒不舒服」已經成為唯一考量。", category: "心理" },
+            { text: "越來越不在意陌生人或半熟人的眼光，覺得做自己最實在。", category: "心理" },
+            { text: "覺得過生日、過節日是一件麻煩且多餘的事情。", category: "心理" },
+            { text: "對於出國旅遊或長途旅行的熱情大幅下降，覺得整理行李很累。", category: "心理" },
+            { text: "覺得一個人獨處的時光，比跟一群人熱鬧聚會還要舒服。", category: "心理" },
+            { text: "經常在心裡感嘆「一代不如一代」。", category: "心理" },
+            { text: "認為自己的人生樣貌大致上已經定型了，很難再有什麼大突破。", category: "心理" },
+
+            // 精神層面 (20-39)
+            { text: "每天早上起床時，經常覺得缺乏動力去面對新的一天。", category: "精神" },
+            { text: "已經很久沒有為了某個興趣或嗜好，達到「廢寢忘食」的狀態了。", category: "精神" },
+            { text: "對於學習新領域的知識，感到力不從心，覺得腦袋轉不動了。", category: "精神" },
+            { text: "即使睡眠時間充足，還是很容易感到疲倦或精神不濟。", category: "精神" },
+            { text: "覺得這個世界變得越來越無趣，沒有什麼新鮮事能引起我的注意。", category: "精神" },
+            { text: "遇到挫折或被批評時，需要花比以前長很多的時間才能平復心情。", category: "精神" },
+            { text: "對於「未來」的期待感正在逐漸消失，只求平平安安過日子。", category: "精神" },
+            { text: "覺得自己的想像力與創造力正在嚴重衰退。", category: "精神" },
+            { text: "回想一下，自己越來越少在日常生活中「開懷大笑」了。", category: "精神" },
+            { text: "在夜深人靜時，經常感到莫名的焦慮、孤獨或空虛感。", category: "精神" },
+            { text: "覺得自己已經失去了年輕時曾經擁有的「夢想」。", category: "精神" },
+            { text: "看到別人對某件事情充滿熱情時，內心毫無波瀾，無法共鳴。", category: "精神" },
+            { text: "覺得每天都在重複一模一樣的行程，自己就像個運作中的機器人。", category: "精神" },
+            { text: "已經很少有什麼事情能讓我感到「熱血沸騰」了。", category: "精神" },
+            { text: "面對困難的問題時，腦海中的第一反應是「放棄」而不是「解決」。", category: "精神" },
+            { text: "如果把自己的精神狀態擬人化，我覺得他/她已經是個老人了。", category: "精神" },
+            { text: "越來越難專注在同一件事情（如看書、看長片）超過半小時。", category: "精神" },
+            { text: "對於「挑戰自我極限」或「突破舒適圈」完全沒有任何興趣。", category: "精神" },
+            { text: "覺得人生就像是一場漫長的消耗戰，精力正在一點一滴流失。", category: "精神" },
+            { text: "內心深處，其實已經默默承認自己「老了」。", category: "精神" }
+        ];
+
+        const optionLabels = [
+            { score: 1, label: "非常不符合 (青春)" },
+            { score: 2, label: "稍微不符合" },
+            { score: 3, label: "普通 / 一半一半" },
+            { score: 4, label: "稍微符合" },
+            { score: 5, label: "非常符合 (老成)" }
+        ];
+
+        // 狀態變數
+        let currentQ = 0;
+        let answers = new Array(40).fill(null);
+        let userName = '';
+        let isPlaying = false;
+
+        // DOM 元素
+        const audioEl = document.getElementById('bg-music');
+        const btnToggleMusic = document.getElementById('btn-toggle-music');
+        const btnStopMusic = document.getElementById('btn-stop-music');
+        const iconMusic = document.getElementById('icon-music');
+        
+        const screenStart = document.getElementById('screen-start');
+        const screenQuiz = document.getElementById('screen-quiz');
+        const screenResult = document.getElementById('screen-result');
+        
+        const inputUsername = document.getElementById('input-username');
+        const btnStartQuiz = document.getElementById('btn-start-quiz');
+        const btnPrevQ = document.getElementById('btn-prev-q');
+        const btnRestart = document.getElementById('btn-restart');
+        const optionsContainer = document.getElementById('quiz-options-container');
+
+        // 音樂控制
+        function updateMusicUI() {
+            if (isPlaying) {
+                iconMusic.classList.remove('fa-volume-xmark');
+                iconMusic.classList.add('fa-volume-up');
+            } else {
+                iconMusic.classList.remove('fa-volume-up');
+                iconMusic.classList.add('fa-volume-xmark');
+            }
+        }
+
+        btnToggleMusic.addEventListener('click', () => {
+            if (isPlaying) {
+                audioEl.pause();
+            } else {
+                audioEl.play().catch(e => console.log("播放失敗:", e));
+            }
+            isPlaying = !isPlaying;
+            updateMusicUI();
+        });
+
+        btnStopMusic.addEventListener('click', () => {
+            audioEl.pause();
+            audioEl.currentTime = 0;
+            isPlaying = false;
+            updateMusicUI();
+        });
+
+        // 畫面切換
+        function showScreen(screenId) {
+            screenStart.classList.add('hidden-screen');
+            screenQuiz.classList.add('hidden-screen');
+            screenResult.classList.add('hidden-screen');
+            document.getElementById(screenId).classList.remove('hidden-screen');
+        }
+
+        // 輸入姓名處理
+        inputUsername.addEventListener('input', (e) => {
+            userName = e.target.value.trim();
+            if (userName) {
+                btnStartQuiz.disabled = false;
+                btnStartQuiz.classList.remove('opacity-50', 'cursor-not-allowed');
+                btnStartQuiz.classList.add('hover:scale-105', 'active:scale-95');
+            } else {
+                btnStartQuiz.disabled = true;
+                btnStartQuiz.classList.add('opacity-50', 'cursor-not-allowed');
+                btnStartQuiz.classList.remove('hover:scale-105', 'active:scale-95');
+            }
+        });
+
+        // 測驗邏輯
+        btnStartQuiz.addEventListener('click', () => {
+            if (!userName) return;
+            
+            if (!isPlaying) {
+                audioEl.play().then(() => {
+                    isPlaying = true;
+                    updateMusicUI();
+                }).catch(e => console.log("瀏覽器阻擋自動播放:", e));
+            }
+
+            currentQ = 0;
+            updateQuizUI();
+            showScreen('screen-quiz');
+        });
+
+        function updateQuizUI() {
+            const q = questions[currentQ];
+            
+            // 更新狀態指示
+            const isPsy = q.category === "心理";
+            document.getElementById('quiz-category-text').textContent = `${q.category}層面評估`;
+            const iconEl = document.getElementById('quiz-category-icon');
+            iconEl.className = isPsy ? "fa-solid fa-brain text-pink-400 text-xl" : "fa-solid fa-heartbeat text-yellow-400 text-xl";
+            
+            document.getElementById('quiz-progress-text').textContent = `${currentQ + 1} / ${questions.length}`;
+            
+            const progressBar = document.getElementById('quiz-progress-bar');
+            progressBar.style.width = `${((currentQ + 1) / questions.length) * 100}%`;
+            progressBar.className = `h-2.5 rounded-full transition-all duration-500 ease-out ${isPsy ? 'bg-pink-500' : 'bg-yellow-500'}`;
+            
+            // 更新題目
+            document.getElementById('quiz-question-text').textContent = q.text;
+
+            // 更新選項按鈕
+            optionsContainer.innerHTML = '';
+            optionLabels.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn w-full p-4 rounded-xl text-left md:text-center text-lg font-medium border border-white/10';
+                
+                if (answers[currentQ] === opt.score) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.add('unselected');
+                }
+                
+                btn.textContent = opt.label;
+                btn.onclick = () => handleAnswer(opt.score);
+                optionsContainer.appendChild(btn);
+            });
+
+            // 更新上一題按鈕狀態
+            if (currentQ === 0) {
+                btnPrevQ.disabled = true;
+                btnPrevQ.className = "flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-white/30 cursor-not-allowed";
+            } else {
+                btnPrevQ.disabled = false;
+                btnPrevQ.className = "flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-slate-300 hover:text-white hover:bg-white/10";
+            }
+        }
+
+        function handleAnswer(score) {
+            answers[currentQ] = score;
+            updateQuizUI(); // 更新選取狀態的樣式
+
+            setTimeout(() => {
+                if (currentQ < questions.length - 1) {
+                    currentQ++;
+                    updateQuizUI();
+                } else {
+                    calculateAndShowResult();
+                }
+            }, 300);
+        }
+
+        btnPrevQ.addEventListener('click', () => {
+            if (currentQ > 0) {
+                currentQ--;
+                updateQuizUI();
+            }
+        });
+
+        // 結算與結果
+        function calculateAndShowResult() {
+            // 計算分數
+            let psyScore = 0, menScore = 0;
+            for(let i=0; i<20; i++) psyScore += (answers[i] || 0);
+            for(let i=20; i<40; i++) menScore += (answers[i] || 0);
+
+            const psyPercent = Math.round(((psyScore - 20) / 80) * 100);
+            const menPercent = Math.round(((menScore - 20) / 80) * 100);
+            const totalIndex = Math.round((psyPercent + menPercent) / 2);
+
+            let title = "";
+            let desc = "";
+
+            if (psyPercent >= 50 && menPercent >= 50) {
+                title = "徹底初老 / 身心已老";
+                desc = "在心理與精神層面上，你都展現出明顯的老化跡象。你可能已經習慣了舒適圈，對新鮮事物缺乏熱情，且精力容易耗盡。這沒有不好，代表你追求穩定與平靜，但也許可以偶爾給自己一點小刺激，找回生命的火花。";
+            } else if (psyPercent >= 50 && menPercent < 50) {
+                title = "靈魂老成，體力充沛";
+                desc = "你的心態像是歷經滄桑的老靈魂，看透世俗、喜歡懷舊、熱愛安穩。但神奇的是，你的精神狀態與活力依然不錯！你可能會把這些精力用在自己真正熱愛且熟悉的事物上，是個懂得享受「高品質靜態生活」的人。";
+            } else if (psyPercent < 50 && menPercent >= 50) {
+                title = "心態年輕，但精力耗盡 (過勞狀態)";
+                desc = "你的思想依然年輕、願意接受新事物、充滿好奇心，但是你的精神與體力卻跟不上大腦的速度。這通常是現代人常見的「過勞」或「燃燒殆盡(Burnout)」現象。你需要好好的休息，讓疲憊的精神力充飽電。";
+            } else {
+                title = "青春無敵 / 身心活力充沛";
+                desc = "恭喜你！無論是心理接受度還是精神層面的活力，你都處於非常年輕的狀態。你對世界充滿好奇，精力旺盛，不害怕改變。請繼續保持這份熱情，享受充滿無限可能的生活！";
+            }
+
+            // 更新 UI
+            document.getElementById('result-user-name').textContent = `${userName} 的評估結果出爐`;
+            document.getElementById('result-total-index').textContent = totalIndex;
+            document.getElementById('result-psy-percent').textContent = psyPercent;
+            document.getElementById('result-men-percent').textContent = menPercent;
+            document.getElementById('result-title').textContent = title;
+            document.getElementById('result-desc').textContent = desc;
+
+            // 更新座標點 (確保稍微延遲以觸發 CSS 轉換動畫)
+            setTimeout(() => {
+                const dot = document.getElementById('result-dot');
+                dot.style.left = `${psyPercent}%`;
+                dot.style.bottom = `${menPercent}%`;
+            }, 100);
+
+            showScreen('screen-result');
+        }
+
+        btnRestart.addEventListener('click', () => {
+            answers = new Array(40).fill(null);
+            currentQ = 0;
+            showScreen('screen-start');
+        });
+
+        // ==================== 3D 背景邏輯 (Three.js) ====================
+        function initThreeJS() {
+            const container = document.getElementById('three-container');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
+            camera.position.set(0, 50, 200);
+
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            const clock = new THREE.Clock();
+
+            // 太陽
+            const sunGeometry = new THREE.SphereGeometry(40, 64, 64);
+            const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.9 });
+            const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+            sun.position.set(0, 20, -300);
+            scene.add(sun);
+
+            // 海洋
+            const oceanGeometry = new THREE.PlaneGeometry(2000, 1000, 64, 32);
+            oceanGeometry.rotateX(-Math.PI / 2);
+            const oceanMaterial = new THREE.MeshStandardMaterial({
+                color: 0x0a1e3f,
+                roughness: 0.2,
+                metalness: 0.8,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.4
+            });
+            const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial);
+            ocean.position.y = -10;
+            scene.add(ocean);
+
+            // 光源
+            const ambientLight = new THREE.AmbientLight(0xffaa55, 0.5);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.PointLight(0xff5500, 2, 1000);
+            sunLight.position.copy(sun.position);
+            scene.add(sunLight);
+
+            function animate() {
+                const elapsedTime = clock.getElapsedTime();
+
+                // 太陽緩慢上下浮動
+                sun.position.y = 20 + Math.sin(elapsedTime * 0.2) * 15;
+                sunLight.position.copy(sun.position);
+
+                // 海洋波浪動畫
+                const positions = ocean.geometry.attributes.position;
+                for (let i = 0; i < positions.count; i++) {
+                    const x = positions.getX(i);
+                    const z = positions.getZ(i);
+                    const y = Math.sin(x * 0.01 + elapsedTime) * 5 + Math.cos(z * 0.02 + elapsedTime * 1.2) * 5;
+                    positions.setY(i, y);
+                }
+                ocean.geometry.attributes.position.needsUpdate = true;
+
+                renderer.render(scene, camera);
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+
+            // RWD 調整
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // 初始化 3D 背景
+        window.onload = initThreeJS;
+    </script>
+</body>
+</html>
