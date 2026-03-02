@@ -210,9 +210,14 @@
             </div>
         </div>
 
-        <button id="btn-restart" class="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/30 rounded-full transition-colors text-white font-medium">
-            <i class="fa-solid fa-rotate-right"></i> 重新測驗
-        </button>
+        <div class="flex flex-col md:flex-row gap-4">
+            <button id="btn-submit" class="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 border border-blue-400 rounded-full transition-colors text-white font-medium shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+                <i id="submit-icon" class="fa-solid fa-cloud-arrow-up"></i> <span id="submit-text">儲存結果至試算表</span>
+            </button>
+            <button id="btn-restart" class="flex items-center justify-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 border border-white/30 rounded-full transition-colors text-white font-medium">
+                <i class="fa-solid fa-rotate-right"></i> 重新測驗
+            </button>
+        </div>
     </div>
 
     <!-- ==================== 程式邏輯 ==================== -->
@@ -277,6 +282,10 @@
         let answers = new Array(40).fill(null);
         let userName = '';
         let isPlaying = false;
+        let currentResultData = null; // 新增：儲存當次結果以便提交
+
+        // ★★★ 請將您發布後的 Google Apps Script 網址貼在下方引號內 ★★★
+        const GOOGLE_SCRIPT_URL = '請替換成你的_WEB_APP_URL';
 
         // DOM 元素
         const audioEl = document.getElementById('bg-music');
@@ -293,6 +302,11 @@
         const btnPrevQ = document.getElementById('btn-prev-q');
         const btnRestart = document.getElementById('btn-restart');
         const optionsContainer = document.getElementById('quiz-options-container');
+
+        // 新增：提交按鈕 DOM
+        const btnSubmit = document.getElementById('btn-submit');
+        const submitIcon = document.getElementById('submit-icon');
+        const submitText = document.getElementById('submit-text');
 
         // 音樂控制
         function updateMusicUI() {
@@ -462,6 +476,23 @@
             document.getElementById('result-title').textContent = title;
             document.getElementById('result-desc').textContent = desc;
 
+            // 儲存當次結果，供提交使用
+            currentResultData = {
+                userName: userName,
+                psyPercent: psyPercent,
+                menPercent: menPercent,
+                totalIndex: totalIndex,
+                title: title,
+                answers: answers
+            };
+
+            // 重置提交按鈕狀態
+            btnSubmit.disabled = false;
+            btnSubmit.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-green-600', 'border-green-400');
+            btnSubmit.classList.add('bg-blue-600', 'hover:bg-blue-500', 'border-blue-400');
+            submitIcon.className = "fa-solid fa-cloud-arrow-up";
+            submitText.textContent = "儲存結果至試算表";
+
             // 更新座標點 (確保稍微延遲以觸發 CSS 轉換動畫)
             setTimeout(() => {
                 const dot = document.getElementById('result-dot');
@@ -476,6 +507,44 @@
             answers = new Array(40).fill(null);
             currentQ = 0;
             showScreen('screen-start');
+        });
+
+        // 提交結果至 Google 試算表邏輯
+        btnSubmit.addEventListener('click', () => {
+            if (!currentResultData || GOOGLE_SCRIPT_URL === '請替換成你的_WEB_APP_URL') {
+                alert('請先在程式碼中設定 GOOGLE_SCRIPT_URL！\n請參考說明設定您的 Google 試算表。');
+                return;
+            }
+
+            // 變更按鈕狀態為載入中
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add('opacity-50', 'cursor-not-allowed');
+            submitIcon.className = "fa-solid fa-spinner fa-spin";
+            submitText.textContent = "儲存中...";
+
+            // 傳送資料
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors', // 避免跨域 (CORS) 阻擋
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(currentResultData)
+            }).then(() => {
+                // 成功狀態 (no-cors 無法讀取回傳值，只要網路沒錯就當作成功)
+                btnSubmit.classList.remove('bg-blue-600', 'hover:bg-blue-500', 'border-blue-400', 'opacity-50', 'cursor-not-allowed');
+                btnSubmit.classList.add('bg-green-600', 'border-green-400');
+                submitIcon.className = "fa-solid fa-check";
+                submitText.textContent = "儲存成功！";
+            }).catch(error => {
+                console.error('Error!', error);
+                alert('儲存失敗，請檢查網路連線。');
+                // 恢復按鈕狀態
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove('opacity-50', 'cursor-not-allowed');
+                submitIcon.className = "fa-solid fa-cloud-arrow-up";
+                submitText.textContent = "重新儲存";
+            });
         });
 
         // ==================== 3D 背景邏輯 (Three.js) ====================
